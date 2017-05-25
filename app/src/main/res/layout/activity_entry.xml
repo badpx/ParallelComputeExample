@@ -7,6 +7,11 @@
     android:layout_height="match_parent"
     tools:context="com.tencent.parallelcomputedemo.EntryActivity">
 
+    <Button
+        android:id="@+id/tnf"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/transform_feedback"/>
     <TextView
         android:id="@+id/sample_text"
         android:layout_width="wrap_content"

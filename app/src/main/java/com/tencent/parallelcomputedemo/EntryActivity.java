@@ -1,10 +1,14 @@
 package com.tencent.parallelcomputedemo;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.TextView;
 
-public class EntryActivity extends Activity {
+import com.tencent.parallelcomputedemo.TransformFeedback.OpenGLES30Activity;
+
+public class EntryActivity extends Activity implements View.OnClickListener {
 
     // Used to load the 'native-lib' library on application startup.
     static {
@@ -18,12 +22,17 @@ public class EntryActivity extends Activity {
 
         // Example of a call to a native method
         TextView tv = (TextView) findViewById(R.id.sample_text);
-        tv.setText(stringFromJNI());
+        findViewById(R.id.tnf).setOnClickListener(this);
+
     }
 
-    /**
-     * A native method that is implemented by the 'native-lib' native library,
-     * which is packaged with this application.
-     */
-    public native String stringFromJNI();
+
+    @Override
+    public void onClick(View view) {
+        switch (view.getId()) {
+            case R.id.tnf:
+                startActivity(new Intent(this, OpenGLES30Activity.class));
+                break;
+        }
+    }
 }
