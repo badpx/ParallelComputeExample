@@ -36,7 +36,7 @@ void main() {  \n\
 }  \n\
 "
 
-void compareBuffer(GLfloat* aBuffer, GLfloat* bBuffer, size_t size) {
+void compareBuffer(GLfloat* cpuBuffer, GLfloat* gpuBuffer, size_t itemNum) {
     union Float_t {
         GLfloat f;
         int32_t i;
@@ -53,9 +53,9 @@ void compareBuffer(GLfloat* aBuffer, GLfloat* bBuffer, size_t size) {
     int32_t minULP = std::numeric_limits<int32_t>::max();
 
     union Float_t cpu, gpu;
-    for (size_t i = 0; i < size; ++i) {
-        cpu.f = aBuffer[i];
-        gpu.f = bBuffer[i];
+    for (size_t i = 0; i < itemNum; ++i) {
+        cpu.f = cpuBuffer[i];
+        gpu.f = gpuBuffer[i];
 
         float error = fabsf((cpu.f - gpu.f) / cpu.f);
 
@@ -78,12 +78,12 @@ void compareBuffer(GLfloat* aBuffer, GLfloat* bBuffer, size_t size) {
     }
 
     if (isCalculationCorrect) {
-        LOGD(TAG, "ULP: avg: %g max: %d, min: %d\n", (double)ULPsum / size, maxULP, minULP);
+        LOGD(TAG, "ULP: avg: %g max: %d, min: %d\n", (double)ULPsum / itemNum, maxULP, minULP);
     } else {
         LOGD(TAG, "WARNING: The ULP error evaluation failed due to sign mismatch!\n");
     }
 
-    LOGD(TAG, "FLT: avg: %g max: %g, min: %g\n", errorSum / size, maxError, minError);
+    LOGD(TAG, "FLT: avg: %g max: %g, min: %g\n", errorSum / itemNum, maxError, minError);
 }
 
 
@@ -124,11 +124,11 @@ Java_com_tencent_parallelcomputedemo_TransformFeedback_MyGLRenderer_computing(
     float* cpuOutputData = NULL;
 
     for (size_t n = 18; n <= POW_MAX; ++n) {
-        const int inputElementNum = (const int) pow(2, n);
+        const size_t inputElementNum = (const size_t) (const int) pow(2, n);
         const size_t inputDataSize = sizeof(GLfloat) * inputElementNum;
 
         // 分配输入数据缓冲
-        GLfloat* inputData = (GLfloat *) malloc(inputDataSize);
+        inputData = (GLfloat *) malloc(inputDataSize);
         if (NULL == inputData) {
             LOGE(TAG, "Alloc input buffer size = %ld out of memory!", inputDataSize);
             break;
@@ -190,7 +190,7 @@ Java_com_tencent_parallelcomputedemo_TransformFeedback_MyGLRenderer_computing(
             LOGE(TAG, "Output buffer=%p, GL Error=%x\n", gpuMemoryBuffer, glGetError());
         }
 
-        dataVerify(cpuOutputData, gpuOutputData, inputElementNum);
+        dataVerify(cpuOutputData, cpuOutputData, inputElementNum);
         FREE(inputData);
         FREE(gpuOutputData);
         FREE(cpuOutputData);
