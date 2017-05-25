@@ -35,6 +35,7 @@ import static android.opengl.GLES20.glGetString;
 public class MyGLRenderer implements GLSurfaceView.Renderer {
 
     private static final String TAG = "MyGLRenderer";
+    private boolean mIsComputed = false;
     /**
      * A native method that is implemented by the 'native-lib' native library,
      * which is do compute with OpenGL ES transform feedback
@@ -53,8 +54,11 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onDrawFrame(GL10 unused) {
-        Log.i(TAG, "Do computing in Renderer.onDrawFrame()");
-        computing();
+        if (!mIsComputed) {
+            mIsComputed = true;
+            Log.i(TAG, "Do computing in Renderer.onDrawFrame()");
+            computing();
+        }
     }
 
     @Override
