@@ -10,6 +10,7 @@
 #include <GLES3/gl3.h>
 #include "Program.h"
 #include "logger.h"
+#include "Timer.h"
 
 #define TAG "T&F"
 
@@ -23,7 +24,8 @@ precision mediump float;    \n\
 layout(location = 0) in vec4 inValue; \n\
 out vec4 outValue; \n\
 void main() {   \n\
-    outValue = 2.0f * exp(-3.0f * inValue) * (sin(0.4f * inValue) + cos(-1.7f * inValue)) + 3.7f;   \n\
+//    outValue = 2.0f * exp(-3.0f * inValue) * (sin(0.4f * inValue) + cos(-1.7f * inValue)) + 3.7f;   \n\
+    outValue = inValue * 3.14159f + 0.5f;   \n\
     //float gray = inValue.r * 0.3 + inValue.g * 0.59 + inValue.b * 0.11 + inValue.a * 1.0;    \n\
     //outValue = vec4(gray, gray, gray, gray);   \n\
 }   \n\
@@ -86,9 +88,19 @@ void compareBuffer(GLfloat* cpuBuffer, GLfloat* gpuBuffer, size_t itemNum) {
     LOGD(TAG, "FLT: avg: %g max: %g, min: %g\n", errorSum / itemNum, maxError, minError);
 }
 
+#define PRINT_SAMPLING(buffer, size) \
+    LOGD(TAG, #buffer":[%ld] = %f, [%ld] = %f, [%ld] = %f, [%ld] = %f, [%ld] = %f", \
+         0L, (buffer)[0],    \
+         (size) / 2 - (size) / 4, (buffer)[(size) / 2 - (size) / 4],   \
+         (size) / 2, (buffer)[(size) / 2],   \
+         (size) / 2 + (size) / 4, (buffer)[(size) / 2 + (size) / 4],   \
+         (size) - 1, (buffer)[(size) - 1])
 
 void dataVerify(float *bufferA, float *bufferB, size_t size) {
     if (NULL != bufferA && NULL != bufferB) {
+        PRINT_SAMPLING(bufferA, size);
+        PRINT_SAMPLING(bufferB, size);
+
         compareBuffer(bufferA, bufferB, size);
     }
 }
@@ -118,12 +130,15 @@ JNIEXPORT void JNICALL
 Java_com_tencent_parallelcomputedemo_TransformFeedback_MyGLRenderer_computing(
         JNIEnv *env,
         jobject /* this */) {
-    const size_t POW_MAX = 20;
+    const size_t POW_MIN = 17;
+    const size_t POW_MAX = 25;
     GLfloat* inputData = NULL;
     float* gpuOutputData = NULL;
     float* cpuOutputData = NULL;
+    Timer timer;
 
-    for (size_t n = 18; n <= POW_MAX; ++n) {
+    LOGI(TAG, "pow, upload, computing, download, GpuTotal, CpuTotal, GpuNormalized, CpuNormalized");
+    for (int n = POW_MIN; n <= POW_MAX; ++n) {
         const size_t inputElementNum = (const size_t) (const int) pow(2, n);
         const size_t inputDataSize = sizeof(GLfloat) * inputElementNum;
 
@@ -135,7 +150,7 @@ Java_com_tencent_parallelcomputedemo_TransformFeedback_MyGLRenderer_computing(
         }
         // 填充输入数据
         for (int j = 0; j < inputElementNum; ++j) {
-            inputData[j] = j % 256;
+            inputData[j] = j;
         }
 
         if (NULL == (cpuOutputData = (float*)malloc(inputDataSize))) {
@@ -144,11 +159,23 @@ Java_com_tencent_parallelcomputedemo_TransformFeedback_MyGLRenderer_computing(
         }
 
         // ====================================== CPU 计算 ==========================================
+        timer.start();
+#if 1
         for (int i = 0; i < inputElementNum; ++i) {
-            float in = inputData[i];
+            float inValue = inputData[i];
             cpuOutputData[i] =
-                    (float) (2.0f * exp(-3.0f * in) * (sin(0.4f * in) + cos(-1.7f * in)) + 3.7f);
+//                    (float) (2.0f * exp(-3.0f * inValue) * (sin(0.4f * inValue) + cos(-1.7f * inValue)) + 3.7f);
+                    inValue * 3.14159f + 0.5f;
         }
+#else
+        for (int i = 0; i < inputElementNum; i += 4) {
+            float* inValue = inputData + i;
+            float gray = inValue[0] * 0.3f + inValue[1] * 0.59f + inValue[2] * 0.11f + inValue[3] * 1.0f;
+            float* outValue = cpuOutputData + i;
+            outValue[0] = outValue[1] = outValue[2] = outValue[3] = gray;
+        }
+#endif
+        long cpuCost = timer.reset();
 
         // ====================================== GPU 计算 ==========================================
         // 使用顶点缓冲区上传输入数据
@@ -156,6 +183,7 @@ Java_com_tencent_parallelcomputedemo_TransformFeedback_MyGLRenderer_computing(
         glBufferData(GL_ARRAY_BUFFER, inputDataSize, inputData, GL_STREAM_DRAW);
         glEnableVertexAttribArray(0);   // layout(location = 0) 指定索引
         glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, NULL);
+        long inputUploadCost = timer.deltaMetering();
 
         // 绑定输出缓冲到 GL_TRANSFORM_FEEDBACK_BUFFER
         glBindBuffer(GL_ARRAY_BUFFER, gGpuOutputBuffer);
@@ -169,9 +197,11 @@ Java_com_tencent_parallelcomputedemo_TransformFeedback_MyGLRenderer_computing(
         // 开启 Transform feedback 模式
         glBeginTransformFeedback(GL_POINTS);
         // 绘制，实际上是将顶点缓冲区中的顶点送往 Vertex Shader 计算
-        glDrawArrays(GL_POINTS, 0, 8);
+        glDrawArrays(GL_POINTS, 0, inputElementNum);
         // 停用 Transform feedback
         glEndTransformFeedback();
+        glFinish();
+        long computingCost = timer.deltaMetering();
 
         glBindBuffer(GL_ARRAY_BUFFER, gGpuOutputBuffer);
         // 将显存里的输出缓冲区映射到内存空间
@@ -180,6 +210,11 @@ Java_com_tencent_parallelcomputedemo_TransformFeedback_MyGLRenderer_computing(
             gpuOutputData = (float*)malloc(inputDataSize);
             if (NULL != gpuOutputData) {
                 memcpy(gpuOutputData, gpuMemoryBuffer, inputDataSize);
+                long memCopyCost = timer.deltaMetering();
+                long gpuCost = timer.duration();
+//                LOGI(TAG, "pow, upload, computing, download, GpuTotal, CpuTotal, GpuNormalized, CpuNormalized");
+                LOGI(TAG, "2^%d, %ld, %ld, %ld, %ld, %ld, %.2f, 1.0",
+                     n, inputUploadCost, computingCost, memCopyCost, gpuCost, cpuCost, (float)gpuCost / cpuCost);
             } else {
                 LOGD(TAG, "Alloc GPU output buffer(size=%ld) out of memory!", inputDataSize);
                 break;
@@ -190,7 +225,10 @@ Java_com_tencent_parallelcomputedemo_TransformFeedback_MyGLRenderer_computing(
             LOGE(TAG, "Output buffer=%p, GL Error=%x\n", gpuMemoryBuffer, glGetError());
         }
 
-        dataVerify(cpuOutputData, cpuOutputData, inputElementNum);
+        // 重新开启光栅化
+        glDisable(GL_RASTERIZER_DISCARD);
+
+        dataVerify(cpuOutputData, gpuOutputData, inputElementNum);
         FREE(inputData);
         FREE(gpuOutputData);
         FREE(cpuOutputData);
@@ -200,6 +238,4 @@ Java_com_tencent_parallelcomputedemo_TransformFeedback_MyGLRenderer_computing(
     FREE(gpuOutputData);
     FREE(cpuOutputData);
 
-    // 重新开启光栅化
-    glDisable(GL_RASTERIZER_DISCARD);
 }

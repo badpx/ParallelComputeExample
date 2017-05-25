@@ -8,10 +8,10 @@
 #include <sys/time.h>
 class Timer {
 public:
-    static uint32_t currentTimeMillis() {
+    static long currentTimeMillis() {
         timeval time;
         gettimeofday( &time, NULL );
-        return (uint32_t) (1000000 * time.tv_sec + time.tv_usec);
+        return (1000000 * time.tv_sec + time.tv_usec) / 1000;   // us to ms
     }
 
     void start() {
@@ -19,22 +19,24 @@ public:
         mLast = mStart;
     }
 
-    uint32_t deltaMetering() {
+    long deltaMetering() {
         timeval time;
         gettimeofday( &time, NULL );
-        uint32_t delta = (uint32_t) (1000000 * (time.tv_sec - mStart.tv_sec ) + time.tv_usec - mStart.tv_usec);
+        long delta = (1000000 * (time.tv_sec - mLast.tv_sec ) + time.tv_usec - mLast.tv_usec) / 1000;
         mLast = time;
         return delta;
     }
 
-    uint32_t duration() {
+    long duration() {
         timeval time;
         gettimeofday( &time, NULL );
-        return (uint32_t) (1000000 * (time.tv_sec - mStart.tv_sec ) + time.tv_usec - mStart.tv_usec);
+        return (1000000 * (time.tv_sec - mStart.tv_sec ) + time.tv_usec - mStart.tv_usec) / 1000;
     }
 
-    uint32_t stop() {
-        return duration();
+    long reset() {
+        long total = duration();
+        start();
+        return total;
     }
 
 private:

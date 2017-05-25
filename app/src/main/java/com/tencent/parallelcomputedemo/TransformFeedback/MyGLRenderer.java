@@ -19,6 +19,7 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 import android.opengl.GLSurfaceView;
+import android.os.SystemClock;
 import android.util.Log;
 
 import static android.opengl.GLES20.glGetString;
@@ -56,8 +57,10 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     public void onDrawFrame(GL10 unused) {
         if (!mIsComputed) {
             mIsComputed = true;
-            Log.i(TAG, "Do computing in Renderer.onDrawFrame()");
+            long start = SystemClock.uptimeMillis();
             computing();
+            Log.i(TAG, "Do computing in Renderer.onDrawFrame() cost=" + (SystemClock.uptimeMillis() - start));
+
         }
     }
 
