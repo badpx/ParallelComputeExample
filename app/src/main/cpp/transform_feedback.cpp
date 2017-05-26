@@ -17,26 +17,93 @@
 #define FREE(ptr)  free(ptr); (ptr) = NULL
 #define ITEMS_COUNT(array)  (sizeof(array) / sizeof(array[0]))
 
-// Vertex shader for computing
-#define VERTEX_SHADER_SOURCE " \
+
+// Simple vertex shader for computing
+#define SIMPLE_VERTEX_SHADER_SOURCE " \
 #version 300 es \n\
 precision mediump float;    \n\
 layout(location = 0) in vec4 inValue; \n\
 out vec4 outValue; \n\
 void main() {   \n\
-//    outValue = 2.0f * exp(-3.0f * inValue) * (sin(0.4f * inValue) + cos(-1.7f * inValue)) + 3.7f;   \n\
+    // Exponential function:    \n\
+    //outValue = 2.0f * exp(-3.0f * inValue) * (sin(0.4f * inValue) + cos(-1.7f * inValue)) + 3.7f;   \n\
+\n\
+    // Linear function:    \n\
     outValue = inValue * 3.14159f + 0.5f;   \n\
-    //float gray = inValue.r * 0.3 + inValue.g * 0.59 + inValue.b * 0.11 + inValue.a * 1.0;    \n\
-    //outValue = vec4(gray, gray, gray, gray);   \n\
 }   \n\
 "
 
 // Empty fragment shader
-#define FRAGMENT_SHADER_SOURCE " \
+#define EMPTY_FRAGMENT_SHADER_SOURCE " \
 #version 300 es \n\
 void main() {  \n\
 }  \n\
 "
+void iterationComputingWithCPU(const float* inBuffer, float* outBuffer, size_t count) {
+    for (int i = 0; i < count; i += 2) {
+        float vx = inBuffer[i];
+        float vy = inBuffer[i+1];
+        float x = 540.0f;
+        float y = 960.0f;
+
+        const float dt = 0.1f;
+
+        for (int c = 0; c < 100; c++) {
+
+            float l = 1.0f/sqrtf(x*x + y*y);
+            float ax = -x*l*l*l;
+            float ay = -y*l*l*l;
+
+            x += vx*dt;
+            y += vy*dt;
+
+            vx += ax*dt;
+            vy += ay*dt;
+        }
+
+        outBuffer[i] = x;
+        outBuffer[i+1] = y;
+    }
+}
+
+// Simple vertex shader for computing
+#define ITERATION_VERTEX_SHADER_SOURCE \
+"#version 300 es \n"\
+"vec2 accel(vec2 p)\n"\
+"{\n"\
+"    float l = 1.0/length(p);\n"\
+"    return -p * (l * l * l);\n"\
+"}\n"\
+"\n"\
+"vec4 f(vec4 x)\n"\
+"{\n"\
+"    const vec2 ExplosionPlace = vec2(540.0, 960.0);\n"\
+"    \n"\
+"    vec4 p = vec4(ExplosionPlace, ExplosionPlace);\n"\
+"    vec4 v = x;\n"\
+"    \n"\
+"    const float dt = 0.1;\n"\
+"    \n"\
+"    for (int i = 0; i < 100; i++) {\n"\
+"        \n"\
+"        vec2 a1 = accel(vec2(p.x, p.y));\n"\
+"        vec2 a2 = accel(vec2(p.z, p.w));\n"\
+"        vec4 a = vec4(a1, a2);\n"\
+"        \n"\
+"        p += v*dt;\n"\
+"        v += a*dt;\n"\
+"    }\n"\
+"\n"\
+"    return p;\n"\
+"}\n"\
+"\n"\
+"precision mediump float;\n"\
+"layout(location = 0) in vec4 inValue;\n"\
+"out vec4 outValue;\n"\
+"void main() {\n"\
+"    outValue = f(inValue);\n"\
+"}"
+
 
 void compareBuffer(GLfloat* cpuBuffer, GLfloat* gpuBuffer, size_t itemNum) {
     union Float_t {
@@ -117,7 +184,7 @@ Java_com_tencent_parallelcomputedemo_TransformFeedback_MyGLRenderer_setup(
     glGenBuffers(1, &gVertexBuffer);
     glGenBuffers(1, &gGpuOutputBuffer);
 
-    Program program = Program(VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
+    Program program = Program(ITERATION_VERTEX_SHADER_SOURCE, EMPTY_FRAGMENT_SHADER_SOURCE);
     const GLchar* varyings[] = {(GLchar*)"outValue"};
     // 确定 Transform Feedback 要获取的 Shader 变量名及属性
     glTransformFeedbackVaryings(program.getProgram(), ITEMS_COUNT(varyings), varyings, GL_INTERLEAVED_ATTRIBS);
@@ -160,21 +227,21 @@ Java_com_tencent_parallelcomputedemo_TransformFeedback_MyGLRenderer_computing(
 
         // ====================================== CPU 计算 ==========================================
         timer.start();
-#if 1
+#if 0
         for (int i = 0; i < inputElementNum; ++i) {
             float inValue = inputData[i];
             cpuOutputData[i] =
+                    // Exponential function test:
 //                    (float) (2.0f * exp(-3.0f * inValue) * (sin(0.4f * inValue) + cos(-1.7f * inValue)) + 3.7f);
+
+                    // Linear function test:
                     inValue * 3.14159f + 0.5f;
         }
 #else
-        for (int i = 0; i < inputElementNum; i += 4) {
-            float* inValue = inputData + i;
-            float gray = inValue[0] * 0.3f + inValue[1] * 0.59f + inValue[2] * 0.11f + inValue[3] * 1.0f;
-            float* outValue = cpuOutputData + i;
-            outValue[0] = outValue[1] = outValue[2] = outValue[3] = gray;
-        }
+        // Iteration function test:
+        iterationComputingWithCPU(inputData, cpuOutputData, inputElementNum);
 #endif
+
         long cpuCost = timer.reset();
 
         // ====================================== GPU 计算 ==========================================
@@ -214,7 +281,7 @@ Java_com_tencent_parallelcomputedemo_TransformFeedback_MyGLRenderer_computing(
                 long gpuCost = timer.duration();
 //                LOGI(TAG, "pow, upload, computing, download, GpuTotal, CpuTotal, GpuNormalized, CpuNormalized");
                 LOGI(TAG, "2^%d, %ld, %ld, %ld, %ld, %ld, %.2f, 1.0",
-                     n, inputUploadCost, computingCost, memCopyCost, gpuCost, cpuCost, (float)gpuCost / cpuCost);
+                     n, inputUploadCost, computingCost, memCopyCost, gpuCost, cpuCost, (float)cpuCost / gpuCost);
             } else {
                 LOGD(TAG, "Alloc GPU output buffer(size=%ld) out of memory!", inputDataSize);
                 break;
