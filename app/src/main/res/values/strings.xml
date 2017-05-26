@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">ParallelComputeDemo</string>
     <string name="transform_feedback">Transform Feedback</string>
+    <string name="render_script">RenderScript</string>
 </resources>

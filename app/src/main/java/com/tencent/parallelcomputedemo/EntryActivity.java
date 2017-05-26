@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.TextView;
 
 import com.tencent.parallelcomputedemo.TransformFeedback.OpenGLES30Activity;
 
@@ -21,8 +20,8 @@ public class EntryActivity extends Activity implements View.OnClickListener {
         setContentView(R.layout.activity_entry);
 
         // Example of a call to a native method
-        TextView tv = (TextView) findViewById(R.id.sample_text);
         findViewById(R.id.tnf).setOnClickListener(this);
+        findViewById(R.id.rs).setOnClickListener(this);
 
     }
 
@@ -32,6 +31,9 @@ public class EntryActivity extends Activity implements View.OnClickListener {
         switch (view.getId()) {
             case R.id.tnf:
                 startActivity(new Intent(this, OpenGLES30Activity.class));
+                break;
+            case R.id.rs:
+                startActivity(new Intent(this, RenderScriptActivity.class));
                 break;
         }
     }
