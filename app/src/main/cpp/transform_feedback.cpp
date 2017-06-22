@@ -107,7 +107,7 @@ Java_com_tencent_parallelcomputedemo_TransformFeedback_MyGLRenderer_setup(
 
     Program program = Program(VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
     const GLchar* varyings[] = {(GLchar*)"outValue"};
-    // 确定 Transform Feedback 要获取的 Shader 变量名及属性
+    // 指定 Transform Feedback 要获取的 Shader 变量名及属性
     glTransformFeedbackVaryings(program.getProgram(), ITEMS_COUNT(varyings), varyings, GL_INTERLEAVED_ATTRIBS);
     program.link();
     program.use();
