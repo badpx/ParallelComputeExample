@@ -1,6 +1,7 @@
 package com.tencent.parallelcomputedemo;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.SystemClock;
@@ -9,6 +10,7 @@ import android.renderscript.Element;
 import android.renderscript.RenderScript;
 import android.util.Log;
 import android.view.View;
+import com.tencent.parallelcomputedemo.TransformFeedback.OpenGLES30Activity;
 
 import java.util.Arrays;
 import java.util.Random;
@@ -67,7 +69,10 @@ public class EntryActivity extends Activity implements View.OnClickListener {
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.tnf:
-//                startActivity(new Intent(this, OpenGLES30Activity.class));
+                startActivity(new Intent(this, OpenGLES30Activity.class));
+                break;
+            case R.id.rs:
+//                startActivity(new Intent(this, RenderScriptActivity.class));
 
                 ScriptC_LookupColorTable lct = new ScriptC_LookupColorTable(mRS);
                 Allocation table = Allocation.createSized(mRS, Element.RGBA_8888(mRS), 256);
@@ -90,9 +95,6 @@ public class EntryActivity extends Activity implements View.OnClickListener {
                 start = SystemClock.uptimeMillis();
                 int ret = lookup(target[0], colors);
                 Log.i(TAG, "CPU Lookup result = " + Arrays.toString(output) + ", cost=" + (SystemClock.uptimeMillis() - start));
-                break;
-            case R.id.rs:
-                startActivity(new Intent(this, RenderScriptActivity.class));
                 break;
         }
     }
